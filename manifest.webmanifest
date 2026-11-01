@@ -1,0 +1,2 @@
+{"name":"Skizzenbrett CAD","short_name":"Skizzenbrett","description":"2D-CAD und CAM in Millimetern","lang":"de","start_url":"./","scope":"./","display":"standalone","orientation":"any","background_color":"#1a1c1f","theme_color":"#1a1c1f",
+"icons":[{"src":"icon-192.png","sizes":"192x192","type":"image/png"},{"src":"icon-512.png","sizes":"512x512","type":"image/png"},{"src":"icon-maskable-512.png","sizes":"512x512","type":"image/png","purpose":"maskable"}]}

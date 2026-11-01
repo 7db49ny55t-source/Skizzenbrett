@@ -1,0 +1,70 @@
+# Baut das Windows- und das Mac-Programm und stellt beide unter "Releases" bereit.
+# Läuft, wenn sich etwas im Ordner desktop/ ändert, oder von Hand über "Actions" → "Run workflow".
+name: Desktop-Apps bauen
+
+on:
+  push:
+    branches: [main]
+    paths: ['desktop/**', '.github/workflows/desktop.yml', 'offline.html']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Eingebaute (verschlüsselte) Kopie der App
+        shell: bash
+        run: mkdir -p desktop/app && cp offline.html desktop/app/index.html && cp *.png desktop/app/
+      - run: npm install
+        working-directory: desktop
+      - run: npx electron-builder --win --x64 --publish never
+        working-directory: desktop
+      - uses: actions/upload-artifact@v4
+        with: { name: windows, path: desktop/dist/Skizzenbrett-Setup.exe }
+
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Eingebaute (verschlüsselte) Kopie der App
+        run: mkdir -p desktop/app && cp offline.html desktop/app/index.html && cp *.png desktop/app/
+      - run: npm install
+        working-directory: desktop
+      - run: npx electron-builder --mac --universal --publish never
+        working-directory: desktop
+      - name: Selbst signieren und packen
+        working-directory: desktop/dist
+        run: |
+          APP=$(find . -maxdepth 2 -name 'Skizzenbrett.app' | head -1)
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep "$APP"
+          ditto -c -k --keepParent "$APP" Skizzenbrett-Mac.zip
+      - uses: actions/upload-artifact@v4
+        with: { name: mac, path: desktop/dist/Skizzenbrett-Mac.zip }
+
+  release:
+    needs: [windows, mac]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { merge-multiple: true, path: out }
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: desktop
+          name: Skizzenbrett für Windows und Mac
+          make_latest: true
+          files: |
+            out/Skizzenbrett-Setup.exe
+            out/Skizzenbrett-Mac.zip
+          body: |
+            **Windows:** Skizzenbrett-Setup.exe herunterladen und starten. Bei „Der Computer wurde durch Windows geschützt“ auf „Weitere Informationen“ → „Trotzdem ausführen“.
+            **Mac:** Skizzenbrett-Mac.zip herunterladen, entpacken und Skizzenbrett in „Programme“ ziehen. Beim ersten Öffnen: Systemeinstellungen → Datenschutz & Sicherheit → „Dennoch öffnen“.
+            Beim ersten Start einmal den persönlichen Entsperr-Link einfügen. Danach lädt das Programm beim Start immer die neueste Version. Ohne Internet läuft die zuletzt geladene.

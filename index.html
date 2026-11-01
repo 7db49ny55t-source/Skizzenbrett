@@ -1,0 +1,43 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Skizzenbrett</title><link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#1a1c1f">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="apple-mobile-web-app-title" content="Skizzenbrett">
+<link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="icon" type="image/png" href="icon-192.png">
+<style>
+:root{color-scheme:dark}html,body{margin:0;height:100%;background:#1a1c1f;color:#e9edf3;font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.w{min-height:100%;display:grid;place-items:center;padding:24px;box-sizing:border-box}
+.c{width:100%;max-width:420px;display:flex;flex-direction:column;gap:14px;text-align:center}
+.c img{width:72px;height:72px;border-radius:18px;margin:0 auto}
+h1{font-size:20px;margin:4px 0 0}p{margin:0;color:#949eab}
+input{height:44px;border-radius:10px;border:1px solid #30343b;background:#232529;color:inherit;padding:0 12px;font:inherit}
+input:focus{outline:none;border-color:#4f8dff}
+button{height:44px;border:0;border-radius:10px;background:#4f8dff;color:#fff;font:inherit;font-weight:600}
+.e{color:#ff6b6b;min-height:1.4em}[hidden]{display:none!important}
+</style></head><body>
+<div class="w" id="lock" hidden><div class="c"><img src="icon-192.png" alt=""><h1>Skizzenbrett ist gesperrt</h1>
+<p>Öffne deinen persönlichen Entsperr-Link oder füge ihn hier ein.</p>
+<input id="k" placeholder="Entsperr-Link oder Schlüssel" autocomplete="off" autocapitalize="off" spellcheck="false">
+<button id="go">Entsperren</button><div class="e" id="err"></div></div></div>
+<div class="w" id="wait"><div class="c"><img src="icon-192.png" alt=""><p id="msg">Skizzenbrett startet …</p></div></div>
+<script>
+/* Start page: the app itself is stored encrypted (AES-GCM) in app.enc. With the key it is decrypted on this device and started. */
+(function(){
+const LSK='skz.key',$=id=>document.getElementById(id);
+const get=k=>{try{return localStorage.getItem(k)}catch(e){return null}},put=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
+const pick=s=>{s=String(s||'').trim();const m=s.match(/[#&?]k=([A-Za-z0-9_-]{40,})/);return m?m[1]:/^[A-Za-z0-9_-]{40,}$/.test(s)?s:null};
+const b64=s=>{s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';const b=atob(s),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u};
+function lock(msg){$('wait').hidden=true;$('lock').hidden=false;$('err').textContent=msg||''}
+async function data(){if(window.SKZ_ENC)return b64(window.SKZ_ENC).buffer;const r=await fetch('app.enc',{cache:'no-cache'});if(!r.ok)throw new Error('net');return r.arrayBuffer()}
+async function open(k){
+  let buf;try{buf=await data()}catch(e){$('msg').textContent='Die App konnte nicht geladen werden. Bitte einmal mit Internet öffnen.';return}
+  let html;try{const key=await crypto.subtle.importKey('raw',b64(k),'AES-GCM',false,['decrypt']);const u=new Uint8Array(buf);
+    const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:u.slice(0,12)},key,u.slice(12));
+    html=await new Response(new Blob([plain]).stream().pipeThrough(new DecompressionStream('gzip'))).text()}
+  catch(e){lock(get(LSK)===k?'Der gespeicherte Schlüssel passt nicht mehr. Bitte den aktuellen Entsperr-Link verwenden.':'Dieser Schlüssel passt nicht.');return}
+  put(LSK,k);document.open();document.write(html);document.close()}
+const fromUrl=pick(location.hash);if(fromUrl){put(LSK,fromUrl);try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}}
+$('go').onclick=()=>{const k=pick($('k').value);if(!k){$('err').textContent='Das ist kein gültiger Entsperr-Link.';return}$('lock').hidden=true;$('wait').hidden=false;open(k)};
+$('k').addEventListener('keydown',e=>{if(e.key==='Enter')$('go').click()});
+const k=fromUrl||get(LSK);if(k)open(k);else lock();
+if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+})();
+</script></body></html>
