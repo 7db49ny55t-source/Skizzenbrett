@@ -54,6 +54,9 @@ jobs:
     needs: [windows, mac]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      - name: Release-Markierung auf den aktuellen Stand setzen
+        run: git tag -f desktop && git push -f origin refs/tags/desktop
       - uses: actions/download-artifact@v4
         with: { merge-multiple: true, path: out }
       - uses: softprops/action-gh-release@v2
